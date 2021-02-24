@@ -1,4 +1,6 @@
 $ pip install flask
 $ pip install flask_sqlalchemy
-$ pip install flask_marshmallow
-$ pip install marshmallow-sqlalchemy
+$ python
+>>> from api import db, Users, Posts
+>>> db.create_all()
+>>> exit()
