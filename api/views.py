@@ -1,5 +1,5 @@
 from run import app, db
-from models import Users
+from models import Users, Posts
 from flask import jsonify, request, make_response
 import os, jwt
 from datetime import datetime, timedelta
@@ -184,21 +184,24 @@ def add_post():
         }), 400
 
     post = Posts.query.filter_by(title=data['title']).first()
+    user = Users.query.filter_by(id=get_jwt_identity()).first()
+    print(user.id)
     if post:
         return jsonify({
-            'message': 'Usuário já existe'
+            'message': 'Post já existe'
         }), 400
     else:
+
+        new_post = Posts(
+            title= data['title'],
+            content = data['content'],
+            userId = Users.query.filter_by(id=user.id).first()
+        )
+
+        db.session.add(new_post)
+        db.session.commit()
         try:
-            new_post = Posts(
-                title= data['title'],
-                content = data['content'],
-                userId = Users.query.filter_by(id=get_jwt_identity()).first()
-            )
-
-            db.session.add(new_post)
-            db.session.commit()
-
+            return jsonify({'message': 'New post'}), 201
         except:
             return jsonify({'message': 'Something went wrong'}), 500
 
@@ -217,15 +220,15 @@ def get_posts():
             'published': post.published,
             'updated': post.updated,
             'user':{
-                [
+
                     'id': post.userId,
-                    {
+
                     'displayName' : user.displayName,
                     'email': user.email,
                     'image': user.image
-                    }
 
-                ]
+
+
             }
         }for post in posts
     ])
@@ -244,15 +247,14 @@ def get_post(id):
             'published': post.published,
             'updated': post.updated,
             'user':{
-                [
+
                     'id': post.userId,
-                    {
                     'displayName' : post.users.displayName,
                     'email': post.users.email,
                     'image': post.users.image
-                    }
 
-                ]
+
+
             }
         }
     ])
@@ -289,25 +291,73 @@ def edit_post(id):
                 'published': post.published,
                 'updated': post.updated,
                 'user':{
-                    [
                         'id': post.userId,
-                        {
                         'displayName' : post.users.displayName,
                         'email': post.users.email,
                         'image': post.users.image
-                        }
 
-                    ]
                 }
             }
         ]), 201
     except:
         return jsonify({'message': 'Something went wrong'}), 500
 
-@app.route('/post/search/', methods =['GET'])
+@app.route('/post/search', methods =['GET'])
 @jwt_required
-def search_post(id):
-    return
+def search_post(query):
+    query = request.args.get('q')
+    print(query)
+    by_title = Posts.query.filter_by(title=('%'+query+'%')).all()
+    by_content = Posts.query.filter_by(content=('%'+query+'%')).all()
+    if by_title:
+        return jsonify([
+            {
+                'id': by_title.id,
+                'title': by_title.title,
+                'content': by_title.content,
+                'published': by_title.published,
+                'updated': by_title.updated,
+                'user':{
+
+                        'id': by_title.userId,
+
+                        'displayName' : by_title.users.displayName,
+                        'email': by_title.users.email,
+                        'image': by_title.users.image
+
+
+
+                }
+            }
+        ]), 201
+    if by_content:
+            return jsonify([
+                {
+                    'id': by_content.id,
+                    'title': by_content.title,
+                    'content': by_content.content,
+                    'published': by_content.published,
+                    'updated': by_content.updated,
+                    'user':{
+
+                            'id': by_content.userId,
+
+                            'displayName' : by_content.users.displayName,
+                            'email': by_content.users.email,
+                            'image': by_content.users.image
+
+
+
+                    }
+                }
+            ]), 201
+    if not by_title and not by_content:
+        if not query:
+            get_posts()
+        else:
+            return jsonify([])
+
+
 
 def token(user_id):
    token = jwt.encode({'public_id': user_id, 'exp' : datetime.utcnow() + timedelta(minutes=30)}, app.config['SECRET_KEY'])

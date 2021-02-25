@@ -32,7 +32,7 @@ class Posts(db.Model):
     updated = db.Column(db.Date, default=datetime.utcnow())
 
 
-    def __init__(self, title, userId):
+    def __init__(self, title, content, userId):
         self.title = title
         self.content = content
         self.userId = userId
