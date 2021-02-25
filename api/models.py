@@ -29,12 +29,10 @@ class Posts(db.Model):
     )
     users = db.relationship("Users", backref="post")
     published = db.Column(db.Date, default=datetime.utcnow())
-    updated = db.Column(db.Date)
+    updated = db.Column(db.Date, default=datetime.utcnow())
 
 
     def __init__(self, title, userId):
         self.title = title
         self.content = content
         self.userId = userId
-        self.published = published
-        self.updated = updated
