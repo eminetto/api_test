@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 import uuid, re
+from sqlalchemy import func
 from passlib.hash import pbkdf2_sha256 as sha256_crypt
 from flask_jwt_extended import (create_access_token, create_refresh_token, jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 
@@ -30,7 +31,7 @@ def get_users():
         }for user in users
     ])
 
-@app.route('/user/<id>/', methods =['GET'])
+@app.route('/user/<id>', methods =['GET'])
 @jwt_required
 def get_user(id):
 
@@ -45,7 +46,7 @@ def get_user(id):
         }
     )
 
-@app.route('/user/<id>/', methods =['DELETE'])
+@app.route('/user/<id>', methods =['DELETE'])
 @jwt_required
 def delete_user(id):
 
@@ -185,7 +186,7 @@ def add_post():
 
     post = Posts.query.filter_by(title=data['title']).first()
     user = Users.query.filter_by(id=get_jwt_identity()).first()
-    print(user.id)
+
     if post:
         return jsonify({
             'message': 'Post já existe'
@@ -195,7 +196,8 @@ def add_post():
         new_post = Posts(
             title= data['title'],
             content = data['content'],
-            userId = Users.query.filter_by(id=user.id).first()
+            userId = user.id
+
         )
 
         db.session.add(new_post)
@@ -210,7 +212,6 @@ def add_post():
 def get_posts():
 
     posts = Posts.query.all()
-    user = Users.query.filter_by(id=post.userId).first()
 
     return jsonify([
         {
@@ -222,10 +223,9 @@ def get_posts():
             'user':{
 
                     'id': post.userId,
-
-                    'displayName' : user.displayName,
-                    'email': user.email,
-                    'image': user.image
+                    'displayName' : post.users.displayName,
+                    'email': post.users.email,
+                    'image': post.users.image
 
 
 
@@ -233,7 +233,7 @@ def get_posts():
         }for post in posts
     ])
 
-@app.route('/post/<id>/', methods =['GET'])
+@app.route('/post/<id>', methods =['GET'])
 @jwt_required
 def get_post(id):
 
@@ -259,7 +259,7 @@ def get_post(id):
         }
     ])
 
-@app.route('/post/<id>/', methods =['PUT'])
+@app.route('/post/<id>', methods =['PUT'])
 @jwt_required
 def edit_post(id):
     data = request.get_json()
@@ -304,31 +304,32 @@ def edit_post(id):
 
 @app.route('/post/search', methods =['GET'])
 @jwt_required
-def search_post(query):
+def search_post():
     query = request.args.get('q')
     print(query)
-    by_title = Posts.query.filter_by(title=('%'+query+'%')).all()
-    by_content = Posts.query.filter_by(content=('%'+query+'%')).all()
+    by_title = Posts.query.filter(func.lower(Posts.title.like('%'+query+'%'))).all()
+    by_content = Posts.query.filter(Posts.content.like('%'+query+'%')).all()
+    print(by_title[0])
     if by_title:
         return jsonify([
             {
-                'id': by_title.id,
-                'title': by_title.title,
-                'content': by_title.content,
-                'published': by_title.published,
-                'updated': by_title.updated,
+                'id': title.id,
+                'title': title.title,
+                'content': title.content,
+                'published': title.published,
+                'updated': title.updated,
                 'user':{
 
-                        'id': by_title.userId,
+                        'id': title.userId,
 
-                        'displayName' : by_title.users.displayName,
-                        'email': by_title.users.email,
-                        'image': by_title.users.image
+                        'displayName' : title.users.displayName,
+                        'email': title.users.email,
+                        'image': title.users.image
 
 
 
                 }
-            }
+            }for title in by_title
         ]), 201
     if by_content:
             return jsonify([
@@ -339,14 +340,10 @@ def search_post(query):
                     'published': by_content.published,
                     'updated': by_content.updated,
                     'user':{
-
                             'id': by_content.userId,
-
                             'displayName' : by_content.users.displayName,
                             'email': by_content.users.email,
                             'image': by_content.users.image
-
-
 
                     }
                 }
@@ -357,7 +354,26 @@ def search_post(query):
         else:
             return jsonify([])
 
+@app.route('/post/<id>', methods =['DELETE'])
+@jwt_required
+def delete_post(id):
+    identity = Users.query.filter_by(id=get_jwt_identity()).first()
+    post =  Posts.query.filter_by(id=id).first_or_404()
+    if post and identity.id == post.users.id :
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({
+            'message' : '',
+        }), 204
 
+    elif identity.id != post.users.id:
+        return jsonify({
+            'message' : 'can not delete it, user unauthorized',
+        }), 401
+    else:
+        return jsonify({
+            'message' : 'post not found',
+        }), 404
 
 def token(user_id):
    token = jwt.encode({'public_id': user_id, 'exp' : datetime.utcnow() + timedelta(minutes=30)}, app.config['SECRET_KEY'])
