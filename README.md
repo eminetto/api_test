@@ -2,13 +2,16 @@
 
 Criando uma API REST em Python + Flask
 
+Acessar branch "init"
 
 
 
 ### Prerequisites
 
 -Python 3.6.2;
+
 -Criar ambiente virtual (venv);
+
 -Instalar módulos: flask, flask_sqlalchemy, flask_jwt_extended, flask_restful;
 
 
